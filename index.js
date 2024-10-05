@@ -13,47 +13,49 @@ const bot = new TelegramBot('7216921050:AAEISmruLCEXGap4zLcpDyzGyLKWTIBq2SU', {
 bot.setWebHook('https://bketuxt5md.execute-api.eu-central-1.amazonaws.com/TelegramBot');
 const dbUrl = 'http://ec2-52-59-228-70.eu-central-1.compute.amazonaws.com:8000/telegram/'
 const notificationQueueUrl = 'https://sqs.eu-central-1.amazonaws.com/816069166828/NotificationQueue';
+const actionBuilderURL = "https://sqs.eu-central-1.amazonaws.com/816069166828/action-builder-q";
 
 
 let username;
 let blink_url;
+let recipients;
 // get blink url and telegram username from the notification sqs
-async function receiveSQSMessages() {
-  const params = {
-    QueueUrl: notificationQueueUrl,
-    MaxNumberOfMessages: 10,
-    WaitTimeSeconds: 5,
-  };
+// async function receiveSQSMessages() {
+//   const params = {
+//     QueueUrl: notificationQueueUrl,
+//     MaxNumberOfMessages: 10,
+//     WaitTimeSeconds: 5,
+//   };
 
-  try {
-    const result = await sqs.receiveMessage(params).promise();
+//   try {
+//     const result = await sqs.receiveMessage(params).promise();
 
-    if (result.Messages && result.Messages.length > 0) {
-      for (const message of result.Messages){
-        const receivedMessage = message;
-        console.log("Message received:", receivedMessage);
+//     if (result.Messages && result.Messages.length > 0) {
+//       for (const message of result.Messages){
+//         const receivedMessage = message;
+//         console.log("Message received:", receivedMessage);
 
-        // Process the message
-        console.log("Message Body:", receivedMessage.Body);
-        const bodyJSON = JSON.parse(receivedMessage.Body)
-        console.log("receiptHandle: ", message.ReceiptHandle)
-        username = bodyJSON.sendData.telegram_user;
-        blink_url = bodyJSON.sendData.blinkUrl
-        console.log("username: ", username)
-        console.log("blink URL: ", blink_url);
-        await deleteMessage(message.ReceiptHandle);
-      };
-    } else {
-      console.log("No messages to process.");
-    }
-  } catch (error) {
-    console.log("error: ", error);
-  }
-}
+//         // Process the message
+//         console.log("Message Body:", receivedMessage.Body);
+//         const bodyJSON = JSON.parse(receivedMessage.Body)
+//         console.log("receiptHandle: ", message.ReceiptHandle)
+//         username = bodyJSON.sendData.telegram_user;
+//         blink_url = bodyJSON.sendData.blinkUrl
+//         console.log("username: ", username)
+//         console.log("blink URL: ", blink_url);
+//         await deleteMessage(message.ReceiptHandle);
+//       };
+//     } else {
+//       console.log("No messages to process.");
+//     }
+//   } catch (error) {
+//     console.log("error: ", error);
+//   }
+// }
 
 async function deleteMessage(receiptHandle) {
   const deleteParams = {
-    QueueUrl: notificationQueueUrl,
+    QueueUrl: actionBuilderURL,
     ReceiptHandle: receiptHandle,
   };
 
@@ -69,13 +71,22 @@ async function deleteMessage(receiptHandle) {
 // Main Lambda handler
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
-  await receiveSQSMessages();
+  // await receiveSQSMessages();
+
+  for (const record of event.Records) {
+    const parsedRecord = JSON.parse(record.body)
+    console.log("parsed record: ", parsedRecord)
+    recipients = parsedRecord.Recipients
+    userId = parsedRecord.User_ID
+    await deleteMessage(record.receiptHandle)
+    console.log("message deleted: ", record.messageId)
+  }
 
   const response = await axios.get(dbUrl);
   const data = response.data;
 
   for (const item of data) {
-    if (item.telegram_user === username) {
+    if (item.telegram_user === recipients) {
       const chatId = item.session_id;
       await bot.sendMessage(chatId, `Here is the url for your BLINK. YES GUYS IM WORKING: ${blink_url}`);
     }
