@@ -14,10 +14,10 @@ bot.setWebHook('https://bketuxt5md.execute-api.eu-central-1.amazonaws.com/Telegr
 const dbUrl = 'http://ec2-52-59-228-70.eu-central-1.compute.amazonaws.com:8000/telegram/'
 const notificationQueueUrl = 'https://sqs.eu-central-1.amazonaws.com/816069166828/NotificationQueue';
 const actionBuilderURL = "https://sqs.eu-central-1.amazonaws.com/816069166828/action-builder-q";
+const actionsDbURL = "http://ec2-52-59-228-70.eu-central-1.compute.amazonaws.com:8000/actions/";
 
 
 let username;
-let blink_url;
 let recipients;
 // get blink url and telegram username from the notification sqs
 // async function receiveSQSMessages() {
@@ -85,10 +85,15 @@ exports.handler = async (event) => {
   const response = await axios.get(dbUrl);
   const data = response.data;
 
+  // get the action based on the action id
+  // const res = await axios.get(actionsDbURL);
+  const actionID = 7
+  const blink_url = `https://dial.to/?action=solana-action%3Ahttps://squint-api.vercel.app/actions/${actionID}`
+
   for (const item of data) {
     if (item.telegram_user === recipients) {
       const chatId = item.session_id;
-      await bot.sendMessage(chatId, `Here is the url for your BLINK. YES GUYS IM WORKING: ${blink_url}`);
+      await bot.sendMessage(chatId, `NOW WE WORK ON THE USDC CASE, but for now here's your blink. ENJOY ${blink_url}`);
     }
   }
 
