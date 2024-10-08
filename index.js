@@ -19,6 +19,7 @@ const actionsDbURL = "http://ec2-52-59-228-70.eu-central-1.compute.amazonaws.com
 
 let username;
 let recipients;
+let transaction_number;
 // get blink url and telegram username from the notification sqs
 // async function receiveSQSMessages() {
 //   const params = {
@@ -78,6 +79,7 @@ exports.handler = async (event) => {
     console.log("parsed record: ", parsedRecord)
     recipients = parsedRecord.Recipients
     userId = parsedRecord.User_ID
+    transaction_number = parsedRecord.Transaction_Index
     await deleteMessage(record.receiptHandle)
     console.log("message deleted: ", record.messageId)
   }
@@ -93,7 +95,7 @@ exports.handler = async (event) => {
   for (const item of data) {
     if (item.telegram_user === recipients) {
       const chatId = item.session_id;
-      await bot.sendMessage(chatId, `NOW WE WORK ON THE USDC CASE, but for now here's your blink. ENJOY ${blink_url}`);
+      await bot.sendMessage(chatId, `crct sent you the blink for reviewing transaction number: ${transaction_number}\n${blink_url}`);
     }
   }
 
