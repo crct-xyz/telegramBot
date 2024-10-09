@@ -6,20 +6,26 @@ const axios = require("axios");
 const sqs = new AWS.SQS();
 
 // Initialize Telegram bot with webhook
-const bot = new TelegramBot('7216921050:AAEISmruLCEXGap4zLcpDyzGyLKWTIBq2SU', {
+const bot = new TelegramBot("7216921050:AAEISmruLCEXGap4zLcpDyzGyLKWTIBq2SU", {
   webHook: true,
 });
 
-bot.setWebHook('https://bketuxt5md.execute-api.eu-central-1.amazonaws.com/TelegramBot');
-const dbUrl = 'http://ec2-52-59-228-70.eu-central-1.compute.amazonaws.com:8000/telegram/'
-const notificationQueueUrl = 'https://sqs.eu-central-1.amazonaws.com/816069166828/NotificationQueue';
-const actionBuilderURL = "https://sqs.eu-central-1.amazonaws.com/816069166828/action-builder-q";
-const actionsDbURL = "http://ec2-52-59-228-70.eu-central-1.compute.amazonaws.com:8000/actions/";
-
+bot.setWebHook(
+  "https://bketuxt5md.execute-api.eu-central-1.amazonaws.com/TelegramBot"
+);
+const dbUrl = "https://squint-api.vercel.app/telegram/";
+const notificationQueueUrl =
+  "https://sqs.eu-central-1.amazonaws.com/816069166828/NotificationQueue";
+const actionBuilderURL =
+  "https://sqs.eu-central-1.amazonaws.com/816069166828/action-builder-q";
+const actionsDbURL = "https://squint-api.vercel.app/actions/";
+const orderDb = "https://squint-api.vercel.app/orders/";
 
 let username;
 let recipients;
 let transaction_number;
+let orderID;
+let actionID;
 // get blink url and telegram username from the notification sqs
 // async function receiveSQSMessages() {
 //   const params = {
@@ -68,49 +74,52 @@ async function deleteMessage(receiptHandle) {
   }
 }
 
-
 // Main Lambda handler
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
   // await receiveSQSMessages();
 
-  for (const record of event.Records) {
-    const parsedRecord = JSON.parse(record.body)
-    console.log("parsed record: ", parsedRecord)
-    recipients = parsedRecord.Recipients
-    userId = parsedRecord.User_ID
-    transaction_number = parsedRecord.Transaction_Index
-    await deleteMessage(record.receiptHandle)
-    console.log("message deleted: ", record.messageId)
-  }
-
-  const response = await axios.get(dbUrl);
-  const data = response.data;
-
-  // get the action based on the action id
-  // const res = await axios.get(actionsDbURL);
-  const actionID = 7
-  const blink_url = `https://dial.to/?action=solana-action%3Ahttps://squint-api.vercel.app/actions/${actionID}`
-
-  for (const item of data) {
-    if (item.telegram_user === recipients) {
-      const chatId = item.session_id;
-      await bot.sendMessage(chatId, `crct sent you the blink for reviewing transaction number: ${transaction_number}\n${blink_url}`);
-    }
-  }
-
   if (event.Records) {
-    // Handle SQS messages
-    return handleSQSMessages(event.Records);
+    for (const record of event.Records) {
+      const parsedRecord = JSON.parse(record.body);
+      console.log("parsed record: ", parsedRecord);
+      recipients = parsedRecord.Recipients;
+      userId = parsedRecord.User_ID;
+      transaction_number = parsedRecord.Transaction_Index;
+      orderID = parsedRecord.Order_id;
+      vaultID = parsedRecord.Vault_ID;
+      actionID = parsedRecord.Action_ID;
+
+      await deleteMessage(record.receiptHandle);
+      console.log("message deleted: ", record.messageId);
+    }
+
+    // reading from the telegram db
+    const response = await axios.get(dbUrl);
+    const data = response.data;
+    // reading from the orders db
+    const ordersResponse = await axios.get(orderDb);
+    const ordersData = ordersResponse.data;
+    // reading from the actions db
+    const actionsResponse = await axios.get(actionsDbURL);
+    const actionsData = actionsResponse.data;
+
+    console.log("action ID: ", actionID);
+    // get the action based on the action id
+    // const res = await axios.get(actionsDbURL);
+    const blink_url = `https://dial.to/?action=solana-action%3Ahttps://squint-api.vercel.app/actions/${actionID}`;
+
+    for (const item of data) {
+      if (item.telegram_user === recipients) {
+        const chatId = item.session_id;
+        await bot.sendMessage(
+          chatId,
+          `crct sent you the blink for reviewing transaction number: ${transaction_number}\n${blink_url}`
+        );
+      }
+    }
   } else if (event.body) {
-    // Handle Telegram updates
     return handleTelegramUpdate(event.body);
-  } else {
-    console.log("Unsupported event type");
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message: "Unsupported event type" }),
-    };
   }
 };
 
@@ -133,6 +142,7 @@ async function handleSQSMessages(records) {
 }
 
 async function handleTelegramUpdate(body) {
+  console.log("body: ", body);
   const update = JSON.parse(body);
   await bot.processUpdate(update);
 
@@ -142,27 +152,30 @@ async function handleTelegramUpdate(body) {
     const data = response.data;
     for (item of data) {
       if (item.session_id === chatId) {
-        console.log("session ID already present in json")
-      }
-      else {
+        console.log("session ID already present in json");
+      } else {
         const postData = {
           telegram_user: update.message.chat.username,
-          session_id: update.message.chat.id
-        }
-        axios.post(dbUrl, postData, {
-          headers: {
-            'Content-Type': 'application/json' // Set the header to specify JSON content
-          }
-        })
-        .then(response => {
-          console.log('Success:');
-        })
-        .catch(error => {
-          console.error('Error:', error);
-        });
+          session_id: update.message.chat.id,
+        };
+        axios
+          .post(dbUrl, postData, {
+            headers: {
+              "Content-Type": "application/json", // Set the header to specify JSON content
+            },
+          })
+          .then((response) => {
+            console.log("Success:");
+          })
+          .catch((error) => {
+            console.error("Error:", error);
+          });
       }
     }
-    await bot.sendMessage(chatId, `Bot has started. there was something wrong with onText. anyways. data = ${data}`);
+    await bot.sendMessage(
+      chatId,
+      `Bot has started. there was something wrong with onText. anyways. data = ${data}`
+    );
     return;
   }
 
@@ -207,6 +220,6 @@ bot.onText(/\/help/, (msg) => {
   const chatId = msg.chat.id;
   bot.sendMessage(
     chatId,
-    "Available commands:\n/start - Start the bot\n/help - Show this help message",
+    "Available commands:\n/start - Start the bot\n/help - Show this help message"
   );
 });
