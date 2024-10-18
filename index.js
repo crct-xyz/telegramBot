@@ -26,39 +26,8 @@ let recipients;
 let transaction_number;
 let orderID;
 let actionID;
-// get blink url and telegram username from the notification sqs
-// async function receiveSQSMessages() {
-//   const params = {
-//     QueueUrl: notificationQueueUrl,
-//     MaxNumberOfMessages: 10,
-//     WaitTimeSeconds: 5,
-//   };
-
-//   try {
-//     const result = await sqs.receiveMessage(params).promise();
-
-//     if (result.Messages && result.Messages.length > 0) {
-//       for (const message of result.Messages){
-//         const receivedMessage = message;
-//         console.log("Message received:", receivedMessage);
-
-//         // Process the message
-//         console.log("Message Body:", receivedMessage.Body);
-//         const bodyJSON = JSON.parse(receivedMessage.Body)
-//         console.log("receiptHandle: ", message.ReceiptHandle)
-//         username = bodyJSON.sendData.telegram_user;
-//         blink_url = bodyJSON.sendData.blinkUrl
-//         console.log("username: ", username)
-//         console.log("blink URL: ", blink_url);
-//         await deleteMessage(message.ReceiptHandle);
-//       };
-//     } else {
-//       console.log("No messages to process.");
-//     }
-//   } catch (error) {
-//     console.log("error: ", error);
-//   }
-// }
+let tgUsername;
+let amount;
 
 async function deleteMessage(receiptHandle) {
   const deleteParams = {
@@ -84,6 +53,8 @@ exports.handler = async (event) => {
       const parsedRecord = JSON.parse(record.body);
       console.log("parsed record: ", parsedRecord);
       recipients = parsedRecord.Recipients;
+      tgUsername = parsedRecord.Tg_Username;
+      amount = parsedRecord.Amount;
       userId = parsedRecord.User_ID;
       transaction_number = parsedRecord.Transaction_Index;
       orderID = parsedRecord.Order_id;
@@ -115,6 +86,12 @@ exports.handler = async (event) => {
         await bot.sendMessage(
           chatId,
           `crct sent you the blink for reviewing transaction number: ${transaction_number}\n${blink_url}`
+        );
+      } else if (item.telegram_user === tgUsername) {
+        const chatId = item.session_id;
+        await bot.sendMessage(
+          chatId,
+          `${tgUsername} has requested ${amount} usdc\n${blink_url}`
         );
       }
     }
