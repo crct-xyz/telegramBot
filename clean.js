@@ -107,7 +107,7 @@ async function handleTelegramUpdate(body) {
     const chatId = update.message.chat.id;
     const username = update.message.chat.username;
 
-    const response = await axios.get(telegramDb);
+    const response = await axios.get(dbUrl);
     const data = response.data;
     for (item of data) {
       if (item.session_id === chatId) {
@@ -147,9 +147,6 @@ exports.handler = async (event) => {
       await deleteMessage(record.receiptHandle);
       console.log("message deleted: ", record.messageId);
 
-      // generate the blink url.
-      // probably a better way to generate this, bec there's issues with the usdc use case.
-      // might need to point to one specific action id from the table
       const blink_url = `https://dial.to/?action=solana-action%3Ahttps://squint-api.vercel.app/actions/${actionID}`;
 
       if (recipients) {
